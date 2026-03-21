@@ -1,0 +1,108 @@
+image: python:3.11-slim
+
+definitions:
+  caches:
+    pip: ~/.cache/pip
+    playwright: ~/.cache/ms-playwright
+
+  steps:
+    - step: &install-dependencies
+        name: Install Dependencies
+        caches:
+          - pip
+          - playwright
+        script:
+          - apt-get update && apt-get install -y wget unzip
+          - pip install --upgrade pip
+          - pip install -r requirements.txt
+          - playwright install chromium
+          - echo "✅ All dependencies installed"
+
+    - step: &run-automation
+        name: Run Multi-Region Transaction Verification
+        caches:
+          - pip
+          - playwright
+        script:
+          - echo "🚀 Starting multi-region transaction verification..."
+          - python -m pytest tests/test_multi_region_automation.py -v --tb=short 2>&1 | tee test_output.log
+          - python src/multi_region_automation.py 2>&1 | tee automation_output.log
+          - echo "✅ Automation execution completed"
+        after-script:
+          - |
+            # Collect all reports
+            mkdir -p reports
+            [ -f transaction_verification_report.json ] && cp transaction_verification_report.json reports/
+            [ -f performance_summary.json ] && cp performance_summary.json reports/
+            [ -f test_output.log ] && cp test_output.log reports/
+            [ -f automation_output.log ] && cp automation_output.log reports/
+
+    - step: &generate-html-report
+        name: Generate HTML Report
+        script:
+          - python scripts/generate_html_report.py
+          - echo "✅ HTML report generated"
+
+    - step: &upload-artifacts
+        name: Upload Artifacts & Reports
+        script:
+          - |
+            echo "📤 Uploading artifacts..."
+            mkdir -p artifacts
+            cp -r reports/* artifacts/ 2>/dev/null || true
+            ls -la artifacts/
+
+    - step: &send-notification
+        name: Send Notification
+        script:
+          - python scripts/send_notifications.py
+          - echo "✅ Notifications sent"
+        after-script:
+          - python scripts/create_summary.py
+
+pipelines:
+  default:
+    - parallel:
+        - step: *install-dependencies
+  
+  branches:
+    main:
+      - step: *install-dependencies
+      - step: *run-automation
+      - step: *generate-html-report
+      - step: *upload-artifacts
+      - step: *send-notification
+
+  schedules:
+    daily-verification:
+      - cron: '0 2 * * *'  # Run at 2 AM daily
+        image: python:3.11-slim
+        trigger: automatic
+        steps:
+          - step:
+              name: Daily Multi-Region Verification
+              caches:
+                - pip
+                - playwright
+              script:
+                - echo "🔔 Starting scheduled daily verification"
+                - python src/multi_region_automation.py --schedule daily
+              after-script:
+                - python scripts/send_notifications.py --type daily_summary
+
+    weekly-comprehensive:
+      - cron: '0 0 ? * MON'  # Run Mondays at midnight
+        image: python:3.11-slim
+        trigger: automatic
+        steps:
+          - step:
+              name: Weekly Comprehensive Verification
+              caches:
+                - pip
+                - playwright
+              script:
+                - echo "🔔 Starting scheduled weekly verification"
+                - python src/multi_region_automation.py --schedule weekly
+              after-script:
+                - python scripts/send_notifications.py --type weekly_summary
+                - python scripts/archive_reports.py
