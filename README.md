@@ -1,47 +1,45 @@
-# Multi-Region Transaction Verification Automation
+# 🔍 Multi-Region Transaction Verification Automation
 
-Autonomous Bitbucket Pipeline for verifying transactions across 8 global regions using Claude AI and Playwright.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Playwright](https://img.shields.io/badge/Playwright-1.49+-green.svg)](https://playwright.dev/)
+[![Claude AI](https://img.shields.io/badge/Claude-AI--Powered-purple.svg)](https://claude.ai/)
 
-## Features
+Autonomous multi-region transaction verification system that uses **Claude AI** and **Playwright** to automatically verify transactions across 8 global regions. Fully integrated with GitHub Actions for scheduled and manual execution.
 
-- ✅ **Autonomous Operation**: Runs on schedule without manual intervention
-- ✅ **Multi-Region Verification**: Tests 8 regional instances in parallel
-- ✅ **AI-Powered**: Uses Claude to intelligently navigate and verify transactions
-- ✅ **Automated Reporting**: Generates detailed HTML and JSON reports
-- ✅ **Slack Integration**: Sends notifications on completion
-- ✅ **Failure Detection**: Identifies issues and provides actionable insights
+## 🌍 Features
 
-## Setup Instructions
+- ✅ **8-Region Support**: Verify transactions across US-EAST, US-WEST, EU-WEST, ASIA-PACIFIC, CANADA, SOUTH-AMERICA, MIDDLE-EAST, and AFRICA
+- ✅ **AI-Powered Automation**: Claude AI intelligently navigates web interfaces
+- ✅ **Parallel Execution**: 4 concurrent browsers for optimal performance (45-60 seconds total)
+- ✅ **Autonomous Operation**: Scheduled daily (2 AM UTC) and weekly (Monday midnight UTC)
+- ✅ **Comprehensive Reporting**: Beautiful HTML reports + JSON data + detailed logs
+- ✅ **Slack Integration**: Automatic notifications on completion
+- ✅ **Failure Detection**: Identifies issues with actionable insights
+- ✅ **GitHub Actions Ready**: Works out of the box with GitHub Workflows
 
-### 1. Configure Bitbucket Pipelines
+## 🚀 Quick Start
 
-Add the `bitbucket-pipelines.yml` file to your repository root.
+### Prerequisites
 
-### 2. Set Environment Variables
+- Python 3.11+
+- GitHub account with repository
+- Anthropic API key
+- Slack webhook (optional, for notifications)
 
-In Bitbucket Cloud Repository Settings → Pipelines → Repository variables, add:
+### Setup Instructions
 
-### 3. Install Dependencies
+#### 1. **Clone or Create Repository**
 
 ```bash
-pip install -r requirements.txt
-playwright install chromium
+git clone https://github.com/nirmalcse/multi-region-tx-verification.git
+cd multi-region-tx-verification
 
-python src/multi_region_automation.py
-
-### Test Locally
-
-# Create virtual environment
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# Install dependencies
 pip install -r requirements.txt
 python -m playwright install chromium
 
-# Create .env from .env.example
 cp .env.example .env
 # Edit .env with your credentials
-
-# Run automation
-python src/multi_region_automation.py

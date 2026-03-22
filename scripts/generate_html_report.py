@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Generate HTML report from JSON results"""
+
 import json
 from datetime import datetime
 from pathlib import Path
@@ -5,7 +8,7 @@ from jinja2 import Template
 
 
 def generate_html_report():
-    """Generate HTML report from JSON results"""
+    """Generate beautiful HTML report from JSON results"""
     
     try:
         with open("transaction_verification_report.json", "r") as f:
@@ -16,7 +19,7 @@ def generate_html_report():
     
     html_template = """
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -44,6 +47,7 @@ def generate_html_report():
                 text-align: center;
             }
             header h1 { font-size: 2.5em; margin-bottom: 10px; }
+            header p { font-size: 1.1em; opacity: 0.9; }
             .metrics {
                 display: grid;
                 grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -58,7 +62,7 @@ def generate_html_report():
                 border-left: 4px solid #667eea;
                 box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             }
-            .metric-card h3 { color: #667eea; font-size: 0.9em; margin-bottom: 10px; }
+            .metric-card h3 { color: #667eea; font-size: 0.9em; margin-bottom: 10px; text-transform: uppercase; }
             .metric-card .value { font-size: 2em; font-weight: bold; color: #333; }
             .metric-card.success { border-left-color: #28a745; }
             .metric-card.success h3 { color: #28a745; }
@@ -67,7 +71,7 @@ def generate_html_report():
             .results {
                 padding: 40px;
             }
-            .results h2 { color: #333; margin-bottom: 20px; }
+            .results h2 { color: #333; margin-bottom: 20px; font-size: 1.8em; }
             .region-item {
                 background: #f8f9fa;
                 border: 1px solid #ddd;
@@ -84,21 +88,45 @@ def generate_html_report():
                 background: #fdf8f8;
             }
             .region-name { font-size: 1.2em; font-weight: bold; margin-bottom: 10px; }
-            .region-status { display: flex; gap: 20px; flex-wrap: wrap; }
+            .region-status { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }
             .status-label {
-                padding: 5px 10px;
+                padding: 5px 12px;
                 border-radius: 4px;
                 font-size: 0.9em;
                 font-weight: bold;
             }
             .status-label.success { background: #d4edda; color: #155724; }
             .status-label.failed { background: #f8d7da; color: #721c24; }
+            .time-badge { background: #e7f3ff; color: #0066cc; padding: 5px 10px; border-radius: 4px; font-size: 0.85em; }
+            .error-text { color: #dc3545; font-weight: bold; }
             footer {
                 background: #f8f9fa;
-                padding: 20px;
+                padding: 30px;
                 text-align: center;
                 color: #666;
                 border-top: 1px solid #ddd;
+            }
+            .progress-bar {
+                width: 100%;
+                height: 30px;
+                background: #e0e0e0;
+                border-radius: 4px;
+                overflow: hidden;
+                margin: 20px 0;
+            }
+            .progress-fill {
+                height: 100%;
+                background: linear-gradient(90deg, #28a745, #20c997);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-weight: bold;
+                font-size: 0.9em;
+            }
+            @media (max-width: 768px) {
+                header h1 { font-size: 1.8em; }
+                .metrics { grid-template-columns: 1fr; }
             }
         </style>
     </head>
@@ -106,52 +134,62 @@ def generate_html_report():
         <div class="container">
             <header>
                 <h1>🔍 Multi-Region Transaction Verification Report</h1>
-                <p>Generated: {{ timestamp }}</p>
+                <p>Automated Verification Results</p>
+                <p style="font-size: 0.95em; margin-top: 10px;">Generated: {{ timestamp }}</p>
             </header>
             
             <div class="metrics">
                 <div class="metric-card">
-                    <h3>Total Duration</h3>
+                    <h3>⏱️ Total Duration</h3>
                     <div class="value">{{ duration }}s</div>
                 </div>
                 <div class="metric-card success">
-                    <h3>Successful Verifications</h3>
+                    <h3>✅ Successful</h3>
                     <div class="value">{{ successful }}/{{ total }}</div>
                 </div>
-                <div class="metric-card {{ 'danger' if failed > 0 else '' }}">
-                    <h3>Failed Verifications</h3>
+                <div class="metric-card {% if failed > 0 %}danger{% endif %}">
+                    <h3>{% if failed > 0 %}❌ Failed{% else %}✅ All Good{% endif %}</h3>
                     <div class="value">{{ failed }}</div>
                 </div>
                 <div class="metric-card">
-                    <h3>Success Rate</h3>
+                    <h3>📊 Success Rate</h3>
                     <div class="value">{{ success_rate }}%</div>
                 </div>
             </div>
             
             <div class="results">
                 <h2>Regional Verification Results</h2>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: {{ success_rate }}%;">
+                        {{ success_rate }}% Complete
+                    </div>
+                </div>
+                
                 {% for result in results %}
                 <div class="region-item {{ 'success' if result.verified else 'failed' }}">
                     <div class="region-name">{{ result.region }}</div>
                     <div class="region-status">
                         <span class="status-label {{ 'success' if result.verified else 'failed' }}">
-                            {{ result.status }}
+                            {{ '✅ ' if result.verified else '❌ ' }}{{ result.status }}
                         </span>
-                        <span>Execution Time: {{ result.execution_time }}s</span>
+                        <span class="time-badge">⏱️ {{ result.execution_time }}s</span>
                         {% if result.transaction_id %}
-                        <span>Transaction ID: {{ result.transaction_id }}</span>
-                        {% endif %}
-                        {% if result.error %}
-                        <span style="color: #dc3545;">Error: {{ result.error }}</span>
+                        <span>TX: {{ result.transaction_id }}</span>
                         {% endif %}
                     </div>
+                    {% if result.error %}
+                    <div style="margin-top: 10px;">
+                        <span class="error-text">Error:</span> {{ result.error }}
+                    </div>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
             
             <footer>
-                <p>Automation Report | Generated: {{ timestamp }}</p>
-                <p><small>All times in UTC</small></p>
+                <p><strong>Automated Verification Service</strong></p>
+                <p style="margin-top: 10px;">Generated: {{ timestamp }}</p>
+                <p><small>All times in UTC | Report ID: {{ report_id }}</small></p>
             </footer>
         </div>
     </body>
@@ -172,7 +210,8 @@ def generate_html_report():
         failed=failed,
         total=len(data['results']),
         success_rate=success_rate,
-        results=data['results']
+        results=data['results'],
+        report_id=datetime.now().strftime('%Y%m%d%H%M%S')
     )
     
     # Save HTML report

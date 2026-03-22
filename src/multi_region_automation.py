@@ -1,13 +1,25 @@
+#!/usr/bin/env python3
+"""
+Multi-Region Transaction Verification Automation
+
+Autonomously verifies transactions across 8 global regions using Claude AI
+and Playwright browser automation.
+
+Author: Automated Testing Suite
+Date: 2024
+License: MIT
+"""
+
 import asyncio
 import json
 import os
 import sys
 import argparse
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 from dataclasses import dataclass, asdict
-import logging
 
 from anthropic import AsyncAnthropic
 from playwright.async_api import async_playwright
@@ -26,6 +38,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class RegionConfig:
+    """Configuration for regional instance"""
     name: str
     url: str
     username: str
@@ -35,6 +48,7 @@ class RegionConfig:
 
 @dataclass
 class TransactionResult:
+    """Result of transaction verification"""
     region: str
     status: str
     transaction_id: str = None
@@ -49,7 +63,12 @@ class MultiRegionAutomationService:
     """Autonomous service for multi-region transaction verification"""
     
     def __init__(self):
-        self.client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        """Initialize the automation service"""
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise ValueError("ANTHROPIC_API_KEY environment variable not set")
+        
+        self.client = AsyncAnthropic(api_key=api_key)
         self.results: List[TransactionResult] = []
         self.start_time = None
         self.end_time = None
@@ -145,13 +164,18 @@ class MultiRegionAutomationService:
         logger.info(f"🔍 Verifying region: {region.name}")
         
         task = f"""
-        Verify transaction for region: {region.name}
+        You are an automated testing agent. Verify a transaction in the {region.name} region.
         
-        Steps:
-        1. Navigate to {region.url}
-        2. Login with provided credentials
-        3. Find and verify transaction with API Key: {region.test_api_key}
-        4. Report the status
+        Task:
+        1. Navigate to the login page at: {region.url}
+        2. Login using the provided credentials
+        3. Navigate to the transactions page
+        4. Search for and verify a transaction using the API Key: {region.test_api_key}
+        5. Extract transaction details (ID, status, timestamp)
+        6. Report the verification status
+        
+        Important: Use web selectors to interact with the page. Be thorough but efficient.
+        Look for common patterns like input[type="email"], input[type="password"], button[type="submit"]
         """
         
         messages = [{"role": "user", "content": task}]
@@ -193,7 +217,7 @@ class MultiRegionAutomationService:
                             })
                             
                             if tool_name == "report_status":
-                                # Extract status
+                                # Extract status and return result
                                 execution_time = (datetime.now() - start).total_seconds()
                                 return TransactionResult(
                                     region=region.name,
@@ -219,7 +243,7 @@ class MultiRegionAutomationService:
                     execution_time=execution_time
                 )
         
-        # Default result if loop exits without explicit status
+        # Default result if loop exits
         execution_time = (datetime.now() - start).total_seconds()
         return TransactionResult(
             region=region.name,
@@ -234,40 +258,41 @@ class MultiRegionAutomationService:
         try:
             if tool_name == "navigate":
                 await page.goto(tool_input["url"], wait_until="domcontentloaded", timeout=30000)
-                return f"Navigated to {tool_input['url']}"
+                await page.wait_for_load_state("networkidle")
+                return f"✅ Navigated to {tool_input['url']}"
             
             elif tool_name == "login":
                 await page.fill(tool_input["username_selector"], tool_input["username"])
                 await page.fill(tool_input["password_selector"], tool_input["password"])
                 await page.click(tool_input["submit_selector"])
                 await page.wait_for_timeout(2000)
-                return "Login submitted"
+                return "✅ Login submitted successfully"
             
             elif tool_name == "wait_for_element":
                 timeout = tool_input.get("timeout_ms", 5000)
                 await page.wait_for_selector(tool_input["selector"], timeout=timeout)
-                return f"Element appeared: {tool_input['selector']}"
+                return f"✅ Element appeared: {tool_input['selector']}"
             
             elif tool_name == "extract_text":
                 text = await page.text_content(tool_input["selector"])
-                return f"Extracted: {text}"
+                return f"✅ Extracted: {text[:200] if text else 'No content'}"
             
             elif tool_name == "click":
                 await page.click(tool_input["selector"])
                 await page.wait_for_timeout(1000)
-                return f"Clicked: {tool_input['selector']}"
+                return f"✅ Clicked: {tool_input['selector']}"
             
             elif tool_name == "fill":
                 await page.fill(tool_input["selector"], tool_input["text"])
-                return f"Filled: {tool_input['selector']}"
+                return f"✅ Filled: {tool_input['selector']}"
             
             elif tool_name == "report_status":
-                return "Status reported successfully"
+                return "✅ Status reported successfully"
             
-            return "Unknown tool"
+            return "⚠️ Unknown tool"
         
         except Exception as e:
-            return f"Error: {str(e)}"
+            return f"❌ Error: {str(e)}"
     
     async def run_verification(self, regions: List[RegionConfig], max_concurrent: int = 4):
         """Run verification across all regions with concurrency control"""
@@ -284,7 +309,7 @@ class MultiRegionAutomationService:
                     browser = await p.chromium.launch(headless=True)
                     context = await browser.new_context(
                         viewport={"width": 1920, "height": 1080},
-                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
                     )
                     page = await context.new_page()
                     
@@ -327,6 +352,7 @@ class MultiRegionAutomationService:
             "results": [asdict(r) for r in self.results]
         }
         
+        Path("reports").mkdir(exist_ok=True)
         with open("transaction_verification_report.json", "w") as f:
             json.dump(results_data, f, indent=2)
         
@@ -370,8 +396,8 @@ class MultiRegionAutomationService:
         
         summary += f"""
 ╔═══════════════════════════════════════════════════════════════════════════╗
-║ Report saved to: transaction_verification_report.json                    ║
-║ Detailed logs saved to: automation_output.log                            ║
+║ Report: transaction_verification_report.json                             ║
+║ Logs: automation_output.log                                              ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 """
         
@@ -383,73 +409,64 @@ class MultiRegionAutomationService:
             f.write(summary)
 
 
-async def main():
-    parser = argparse.ArgumentParser(description="Multi-Region Transaction Verification")
-    parser.add_argument("--schedule", choices=["daily", "weekly"], default="manual")
-    args = parser.parse_args()
+def load_regions_from_env() -> List[RegionConfig]:
+    """Load region configurations from environment variables"""
+    regions = []
     
-    # Load region configurations from environment or config file
-    regions = [
-        RegionConfig(
-            name="US-EAST",
-            url="https://api-us-east.example.com/login",
-            username=os.getenv("US_EAST_USERNAME", "testuser"),
-            password=os.getenv("US_EAST_PASSWORD", "password"),
-            test_api_key=os.getenv("US_EAST_API_KEY", "test_key_us_east")
-        ),
-        RegionConfig(
-            name="US-WEST",
-            url="https://api-us-west.example.com/login",
-            username=os.getenv("US_WEST_USERNAME", "testuser"),
-            password=os.getenv("US_WEST_PASSWORD", "password"),
-            test_api_key=os.getenv("US_WEST_API_KEY", "test_key_us_west")
-        ),
-        RegionConfig(
-            name="EU-WEST",
-            url="https://api-eu-west.example.com/login",
-            username=os.getenv("EU_WEST_USERNAME", "testuser"),
-            password=os.getenv("EU_WEST_PASSWORD", "password"),
-            test_api_key=os.getenv("EU_WEST_API_KEY", "test_key_eu_west")
-        ),
-        RegionConfig(
-            name="ASIA-PACIFIC",
-            url="https://api-ap.example.com/login",
-            username=os.getenv("AP_USERNAME", "testuser"),
-            password=os.getenv("AP_PASSWORD", "password"),
-            test_api_key=os.getenv("AP_API_KEY", "test_key_ap")
-        ),
-        RegionConfig(
-            name="CANADA",
-            url="https://api-ca.example.com/login",
-            username=os.getenv("CA_USERNAME", "testuser"),
-            password=os.getenv("CA_PASSWORD", "password"),
-            test_api_key=os.getenv("CA_API_KEY", "test_key_ca")
-        ),
-        RegionConfig(
-            name="SOUTH-AMERICA",
-            url="https://api-sa.example.com/login",
-            username=os.getenv("SA_USERNAME", "testuser"),
-            password=os.getenv("SA_PASSWORD", "password"),
-            test_api_key=os.getenv("SA_API_KEY", "test_key_sa")
-        ),
-        RegionConfig(
-            name="MIDDLE-EAST",
-            url="https://api-me.example.com/login",
-            username=os.getenv("ME_USERNAME", "testuser"),
-            password=os.getenv("ME_PASSWORD", "password"),
-            test_api_key=os.getenv("ME_API_KEY", "test_key_me")
-        ),
-        RegionConfig(
-            name="AFRICA",
-            url="https://api-africa.example.com/login",
-            username=os.getenv("AFRICA_USERNAME", "testuser"),
-            password=os.getenv("AFRICA_PASSWORD", "password"),
-            test_api_key=os.getenv("AFRICA_API_KEY", "test_key_africa")
-        ),
+    region_names = [
+        ("US-EAST", "US_EAST"),
+        ("US-WEST", "US_WEST"),
+        ("EU-WEST", "EU_WEST"),
+        ("ASIA-PACIFIC", "AP"),
+        ("CANADA", "CA"),
+        ("SOUTH-AMERICA", "SA"),
+        ("MIDDLE-EAST", "ME"),
+        ("AFRICA", "AFRICA"),
     ]
     
-    service = MultiRegionAutomationService()
-    await service.run_verification(regions, max_concurrent=4)
+    for display_name, env_prefix in region_names:
+        region = RegionConfig(
+            name=display_name,
+            url=os.getenv(f"{env_prefix}_URL", f"https://api-{env_prefix.lower()}.example.com/login"),
+            username=os.getenv(f"{env_prefix}_USERNAME", "testuser"),
+            password=os.getenv(f"{env_prefix}_PASSWORD", "password"),
+            test_api_key=os.getenv(f"{env_prefix}_API_KEY", f"test_key_{env_prefix.lower()}")
+        )
+        regions.append(region)
+    
+    return regions
+
+
+async def main():
+    """Main entry point"""
+    parser = argparse.ArgumentParser(description="Multi-Region Transaction Verification")
+    parser.add_argument("--schedule", choices=["daily", "weekly"], default="manual",
+                       help="Schedule type for logging purposes")
+    parser.add_argument("--regions", type=int, default=8,
+                       help="Number of regions to verify")
+    parser.add_argument("--concurrent", type=int, default=4,
+                       help="Maximum concurrent browsers")
+    args = parser.parse_args()
+    
+    logger.info(f"Starting automation - Schedule: {args.schedule}")
+    logger.info(f"Configuration: {args.regions} regions, {args.concurrent} concurrent")
+    
+    try:
+        regions = load_regions_from_env()[:args.regions]
+        service = MultiRegionAutomationService()
+        await service.run_verification(regions, max_concurrent=args.concurrent)
+        
+        # Exit with success if all verified
+        successful = sum(1 for r in service.results if r.verified)
+        if successful == len(service.results):
+            sys.exit(0)
+        else:
+            logger.warning(f"Some regions failed: {successful}/{len(service.results)} successful")
+            sys.exit(1)
+    
+    except Exception as e:
+        logger.error(f"Fatal error: {str(e)}", exc_info=True)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

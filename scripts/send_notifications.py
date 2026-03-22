@@ -1,7 +1,10 @@
+#!/usr/bin/env python3
+"""Send notifications for verification results"""
+
 import json
 import os
-from pathlib import Path
 import argparse
+from pathlib import Path
 from datetime import datetime
 
 
@@ -9,62 +12,53 @@ def send_slack_notification(summary: dict):
     """Send notification to Slack"""
     webhook_url = os.getenv("SLACK_WEBHOOK_URL")
     if not webhook_url:
-        print("⚠️  SLACK_WEBHOOK_URL not configured")
+        print("⚠️  SLACK_WEBHOOK_URL not configured, skipping Slack notification")
         return
     
-    import requests
-    
-    color = "good" if summary['failed'] == 0 else "danger"
-    
-    payload = {
-        "attachments": [
-            {
-                "color": color,
-                "title": "🔍 Multi-Region Transaction Verification Report",
-                "text": f"Verification completed at {summary['timestamp']}",
-                "fields": [
-                    {
-                        "title": "Total Duration",
-                        "value": f"{summary['duration']:.1f}s",
-                        "short": True
-                    },
-                    {
-                        "title": "Success Rate",
-                        "value": f"{summary['success_rate']:.1f}%",
-                        "short": True
-                    },
-                    {
-                        "title": "Successful",
-                        "value": str(summary['successful']),
-                        "short": True
-                    },
-                    {
-                        "title": "Failed",
-                        "value": str(summary['failed']),
-                        "short": True
-                    }
-                ],
-                "footer": "Automated Verification Service"
-            }
-        ]
-    }
-    
     try:
-        response = requests.post(webhook_url, json=payload)
+        import requests
+        
+        color = "good" if summary['failed'] == 0 else "danger"
+        
+        payload = {
+            "attachments": [
+                {
+                    "color": color,
+                    "title": "🔍 Multi-Region Transaction Verification",
+                    "text": f"Verification Report - {summary['timestamp']}",
+                    "fields": [
+                        {
+                            "title": "Duration",
+                            "value": f"{summary['duration']:.1f}s",
+                            "short": True
+                        },
+                        {
+                            "title": "Success Rate",
+                            "value": f"{summary['success_rate']:.1f}%",
+                            "short": True
+                        },
+                        {
+                            "title": "Successful",
+                            "value": str(summary['successful']),
+                            "short": True
+                        },
+                        {
+                            "title": "Failed",
+                            "value": str(summary['failed']),
+                            "short": True
+                        }
+                    ],
+                    "footer": "Automated Verification Service",
+                    "ts": int(datetime.now().timestamp())
+                }
+            ]
+        }
+        
+        response = requests.post(webhook_url, json=payload, timeout=10)
         response.raise_for_status()
         print("✅ Slack notification sent")
     except Exception as e:
-        print(f"❌ Failed to send Slack notification: {e}")
-
-
-def send_email_notification(summary: dict):
-    """Send email notification"""
-    # Implement email sending if needed
-    email = os.getenv("NOTIFICATION_EMAIL")
-    if not email:
-        return
-    
-    print(f"📧 Email notification would be sent to: {email}")
+        print(f"⚠️  Failed to send Slack notification: {e}")
 
 
 def main():
@@ -92,8 +86,7 @@ def main():
     
     print(f"📤 Sending {args.type} notification...")
     send_slack_notification(summary)
-    send_email_notification(summary)
-    print("✅ Notifications sent")
+    print("✅ Notifications completed")
 
 
 if __name__ == "__main__":

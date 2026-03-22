@@ -1,13 +1,15 @@
+#!/usr/bin/env python3
+"""Create execution summary for CI/CD pipeline"""
+
 import json
 from pathlib import Path
 from datetime import datetime
 
 
 def create_summary():
-    """Create execution summary for Bitbucket pipeline"""
+    """Create execution summary for pipeline"""
     
     report_path = Path("transaction_verification_report.json")
-    summary_path = Path("verification_summary.txt")
     
     if not report_path.exists():
         print("❌ No report found")
@@ -36,31 +38,26 @@ def create_summary():
   ❌ Failed:          {failed}
   Success Rate:       {success_rate:.1f}%
 
-🎯 ACTION ITEMS
+🎯 STATUS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
     
     if failed > 0:
-        summary += "\n⚠️  FAILURES DETECTED - Review Required:\n"
+        summary += "⚠️  FAILURES DETECTED - Review Required:\n\n"
         for result in data['results']:
             if not result['verified']:
-                summary += f"  • {result['region']}: {result.get('error', 'Verification failed')}\n"
+                summary += f"  • {result['region']}\n"
                 summary += f"    Status: {result['status']}\n"
+                if result.get('error'):
+                    summary += f"    Error: {result['error']}\n"
     else:
-        summary += "\n✅ ALL REGIONS VERIFIED SUCCESSFULLY\n"
+        summary += "✅ ALL REGIONS VERIFIED SUCCESSFULLY\n\n"
     
     summary += f"""
-📝 NEXT STEPS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. Review the full HTML report: reports/transaction_verification_report.html
-2. Check detailed logs: automation_output.log
-3. Download JSON report: transaction_verification_report.json
-4. If failures exist, investigate and re-run verification
-
-📂 ARTIFACTS GENERATED
+📝 GENERATED ARTIFACTS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✓ transaction_verification_report.json
-✓ transaction_verification_report.html
+✓ reports/transaction_verification_report.html
 ✓ automation_output.log
 ✓ verification_summary.txt
 
@@ -69,10 +66,10 @@ def create_summary():
     
     print(summary)
     
-    with open(summary_path, "w") as f:
+    with open("verification_summary.txt", "w") as f:
         f.write(summary)
     
-    print(f"✅ Summary saved to: {summary_path}")
+    print(f"✅ Summary saved")
 
 
 if __name__ == "__main__":
